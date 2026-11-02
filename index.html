@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PSP Texture Rename & Mapping Tool</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- JSZip for ZIP download support -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        psp: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                            800: '#3730a3',
+                            900: '#1e1b4b',
+                            dark: '#0f172a',
+                            card: '#1e293b'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom scrollbar for output box */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans">
+
+    <!-- Header / Navbar -->
+    <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-3 sm:px-6 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/30">
+                    <i class="fa-solid fa-gamepad text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight text-white">PSP Texture Modding Tool</h1>
+                    <p class="text-xs text-slate-400">Rename Hash & Ini Mapping Generator</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="text-xs px-2.5 py-1 rounded-full bg-indigo-950/80 text-indigo-300 border border-indigo-800/50">
+                    <i class="fa-solid fa-bolt mr-1"></i> PPSSPP Ready
+                </span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- Left Column: Controls & File Queue (7 cols) -->
+        <section class="lg:col-span-7 flex flex-col gap-5">
+            
+            <!-- Upload & Drag-Drop Box -->
+            <div class="bg-slate-900 border-2 border-dashed border-slate-700 hover:border-indigo-500 transition-all rounded-2xl p-6 text-center cursor-pointer relative group"
+                 id="dropZone" onclick="document.getElementById('fileInput').click()">
+                <input type="file" id="fileInput" multiple accept="image/*" class="hidden" onchange="handleFileSelect(event)">
+                <div class="flex flex-col items-center justify-center gap-3">
+                    <div class="w-14 h-14 rounded-full bg-slate-800 flex items-center justify-center text-indigo-400 group-hover:scale-110 transition-transform">
+                        <i class="fa-solid fa-folder-open text-2xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-base font-medium text-slate-200">Klik atau drag & drop foto ke sini</p>
+                        <p class="text-xs text-slate-400 mt-1">Mendukung upload banyak file sekaligus (Sesuai urutan pilihan)</p>
+                    </div>
+                    <button type="button" class="mt-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium shadow-md shadow-indigo-600/20 transition-all">
+                        <i class="fa-solid fa-plus mr-1.5"></i> Open Image
+                    </button>
+                </div>
+            </div>
+
+            <!-- Mapping Settings -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                    <i class="fa-solid fa-sliders text-indigo-400"></i> Pengaturan Format Path & Kode
+                </h2>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Path Input -->
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1.5">Alamat Path / Subfolder Tekstur</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500 text-sm">
+                                <i class="fa-solid fa-folder-tree"></i>
+                            </span>
+                            <input type="text" id="pathPrefix" value="= trmd26/textures" 
+                                   class="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-sm font-mono text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors"
+                                   placeholder="= trmd26/textures" oninput="updatePreview()">
+                        </div>
+                        <p class="text-[11px] text-slate-400 mt-1">Gunakan tanda sama dengan (=) atau letakkan lokasi folder.</p>
+                    </div>
+
+                    <!-- Custom Extension Toggle -->
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1.5">Ekstensi File Output</label>
+                        <select id="fileExt" onchange="updatePreview()" class="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-sm font-mono text-slate-200 focus:outline-none focus:border-indigo-500">
+                            <option value=".png">.png (Standard)</option>
+                            <option value=".jpg">.jpg</option>
+                            <option value="">Tanpa Ekstensi (Address Only)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Selected Files List / Sequence Manager -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex-1 flex flex-col min-h-[300px]">
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                        <i class="fa-solid fa-list-ol text-indigo-400"></i> Daftar File Diload (<span id="fileCount">0</span>)
+                    </h2>
+                    <button onclick="clearAllFiles()" class="text-xs text-rose-400 hover:text-rose-300 transition-colors flex items-center gap-1" id="btnClear" style="display:none;">
+                        <i class="fa-solid fa-trash-can"></i> Hapus Semua
+                    </button>
+                </div>
+
+                <!-- Empty State -->
+                <div id="emptyState" class="flex-1 flex flex-col items-center justify-center text-slate-500 border border-dashed border-slate-800 rounded-xl p-8">
+                    <i class="fa-solid fa-images text-3xl mb-2 text-slate-600"></i>
+                    <p class="text-sm">Belum ada foto yang dipilih.</p>
+                </div>
+
+                <!-- File Items List -->
+                <div id="fileList" class="space-y-2 overflow-y-auto max-h-[350px] pr-1 flex-1 hidden">
+                    <!-- Dynamic List Items will be injected here -->
+                </div>
+            </div>
+
+        </section>
+
+        <!-- Right Column: Result Preview & Export Actions (5 cols) -->
+        <section class="lg:col-span-5 flex flex-col gap-5">
+            
+            <!-- Output Configuration Code Box -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex-1 flex flex-col">
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                        <i class="fa-solid fa-code text-indigo-400"></i> Hasil Text Mapping
+                    </h2>
+                    <button onclick="copyOutputText()" class="text-xs px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 rounded-lg transition-all flex items-center gap-1.5">
+                        <i class="fa-solid fa-copy"></i> Copy Result
+                    </button>
+                </div>
+
+                <!-- Result Textarea -->
+                <div class="relative flex-1 min-h-[280px]">
+                    <textarea id="outputText" readonly
+                              class="w-full h-full bg-slate-950 border border-slate-800 rounded-xl p-3.5 font-mono text-xs text-indigo-200 focus:outline-none resize-none leading-relaxed"
+                              placeholder="Hasil format mapping akan muncul di sini...&#10;Contoh:&#10;0000000000000000c88ed3f4 = trmd26/textures.png"></textarea>
+                </div>
+
+                <!-- Download Options Button Group -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+                    <button onclick="downloadConfigFile()" class="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold border border-slate-700 transition-all flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-file-arrow-down text-indigo-400"></i> Simpan Config (.txt)
+                    </button>
+                    <button onclick="downloadRenamedImagesZip()" class="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-indigo-600/25 transition-all flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-file-zipper"></i> Download Foto (.zip)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Rules Explanation / Tips -->
+            <div class="bg-indigo-950/40 border border-indigo-900/50 rounded-2xl p-4 text-xs text-indigo-200/80 space-y-2">
+                <div class="font-semibold text-indigo-300 flex items-center gap-1.5">
+                    <i class="fa-solid fa-circle-info"></i> Informasi Aturan Rename:
+                </div>
+                <ul class="list-disc list-inside space-y-1 text-slate-400">
+                    <li>16 Karakter awal diganti menjadi angka nol: <span class="font-mono text-indigo-300">0000000000000000</span></li>
+                    <li>8 Karakter hash di akhir tetap dipertahankan dari file asli.</li>
+                    <li>Urutan foto yang dipilih dijamin urut sesuai pilihan kamu.</li>
+                </ul>
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-5 right-5 bg-indigo-600 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 transition-opacity duration-300 opacity-0 pointer-events-none z-50">
+        <i class="fa-solid fa-circle-check text-lg"></i>
+        <span id="toastMsg" class="text-sm font-medium">Berhasil disalin!</span>
+    </div>
+
+    <!-- JavaScript Application Logic -->
+    <script>
+        // Array to store selected image files with custom metadata
+        let fileQueue = [];
+
+        // Handle File Input Selection (Preserves native browser selection order)
+        function handleFileSelect(event) {
+            const files = Array.from(event.target.files);
+            if (files.length === 0) return;
+
+            files.forEach(file => {
+                const pspCode = transformPspFilename(file.name);
+                fileQueue.push({
+                    id: Math.random().toString(36).substring(2, 9),
+                    file: file,
+                    originalName: file.name,
+                    pspCode: pspCode,
+                    previewUrl: URL.createObjectURL(file)
+                });
+            });
+
+            // Reset input so user can re-select same file if needed
+            event.target.value = '';
+            
+            renderFileList();
+            updatePreview();
+        }
+
+        // Transformation Algorithm: 16 Zeros + Last 8 Chars Hash
+        function transformPspFilename(filename) {
+            // Remove file extension for code extraction
+            const nameWithoutExt = filename.substring(0, filename.lastIndexOf('.')) || filename;
+            
+            // If filename length is at least 8 characters, extract the last 8 chars
+            let last8Chars = "00000000";
+            if (nameWithoutExt.length >= 8) {
+                last8Chars = nameWithoutExt.slice(-8);
+            } else {
+                // Pad if less than 8
+                last8Chars = nameWithoutExt.padStart(8, '0');
+            }
+
+            // 16 Zeroes + 8 Chars Hash = Total 24 Characters
+            return "0000000000000000" + last8Chars;
+        }
+
+        // Render Loaded Files List
+        function renderFileList() {
+            const fileListEl = document.getElementById('fileList');
+            const emptyStateEl = document.getElementById('emptyState');
+            const btnClearEl = document.getElementById('btnClear');
+            const fileCountEl = document.getElementById('fileCount');
+
+            fileCountEl.textContent = fileQueue.length;
+
+            if (fileQueue.length === 0) {
+                fileListEl.classList.add('hidden');
+                emptyStateEl.classList.remove('hidden');
+                btnClearEl.style.display = 'none';
+                return;
+            }
+
+            fileListEl.classList.remove('hidden');
+            emptyStateEl.classList.add('hidden');
+            btnClearEl.style.display = 'flex';
+
+            fileListEl.innerHTML = '';
+
+            fileQueue.forEach((item, index) => {
+                const fileItemHtml = `
+                    <div class="flex items-center justify-between p-2.5 bg-slate-950 border border-slate-800/80 rounded-xl group hover:border-indigo-500/50 transition-all">
+                        <div class="flex items-center gap-3 overflow-hidden">
+                            <span class="w-6 h-6 flex items-center justify-center rounded-lg bg-slate-800 text-indigo-400 font-mono text-xs font-bold">
+                                ${index + 1}
+                            </span>
+                            <img src="${item.previewUrl}" alt="preview" class="w-10 h-10 object-cover rounded-lg bg-slate-900 border border-slate-800">
+                            <div class="overflow-hidden">
+                                <p class="text-xs font-mono font-medium text-slate-200 truncate" title="${item.originalName}">${item.originalName}</p>
+                                <p class="text-[11px] font-mono text-indigo-400 flex items-center gap-1">
+                                    <i class="fa-solid fa-arrow-right text-[9px] text-slate-500"></i> ${item.pspCode}.png
+                                </p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+                            <button onclick="moveItem(${index}, -1)" class="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg transition-colors ${index === 0 ? 'invisible' : ''}" title="Naikkan Urutan">
+                                <i class="fa-solid fa-chevron-up text-xs"></i>
+                            </button>
+                            <button onclick="moveItem(${index}, 1)" class="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg transition-colors ${index === fileQueue.length - 1 ? 'invisible' : ''}" title="Turunkan Urutan">
+                                <i class="fa-solid fa-chevron-down text-xs"></i>
+                            </button>
+                            <button onclick="removeItem('${item.id}')" class="p-1.5 hover:bg-rose-950/50 text-slate-500 hover:text-rose-400 rounded-lg transition-colors ml-1" title="Hapus">
+                                <i class="fa-solid fa-xmark text-xs"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+                fileListEl.insertAdjacentHTML('beforeend', fileItemHtml);
+            });
+        }
+
+        // Reorder Queue Item
+        function moveItem(index, direction) {
+            const newIndex = index + direction;
+            if (newIndex < 0 || newIndex >= fileQueue.length) return;
+            const temp = fileQueue[index];
+            fileQueue[index] = fileQueue[newIndex];
+            fileQueue[newIndex] = temp;
+            renderFileList();
+            updatePreview();
+        }
+
+        // Remove Single Item
+        function removeItem(id) {
+            fileQueue = fileQueue.filter(item => item.id !== id);
+            renderFileList();
+            updatePreview();
+        }
+
+        // Clear All Queue
+        function clearAllFiles() {
+            fileQueue = [];
+            renderFileList();
+            updatePreview();
+        }
+
+        // Update Text Mapping Output Area
+        function updatePreview() {
+            const pathPrefix = document.getElementById('pathPrefix').value;
+            const fileExt = document.getElementById('fileExt').value;
+            const outputTextarea = document.getElementById('outputText');
+
+            if (fileQueue.length === 0) {
+                outputTextarea.value = '';
+                return;
+            }
+
+            const lines = fileQueue.map(item => {
+                return `${item.pspCode} ${pathPrefix}${fileExt}`;
+            });
+
+            outputTextarea.value = lines.join('\n');
+        }
+
+        // Copy Text Result to Clipboard
+        function copyOutputText() {
+            const outputTextarea = document.getElementById('outputText');
+            if (!outputTextarea.value) return;
+
+            outputTextarea.select();
+            document.execCommand('copy');
+
+            showToast("Hasil text mapping berhasil disalin!");
+        }
+
+        // Download Config as .txt File
+        function downloadConfigFile() {
+            const text = document.getElementById('outputText').value;
+            if (!text) {
+                showToast("Tidak ada data untuk diunduh!");
+                return;
+            }
+
+            const blob = new Blob([text], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'textures.ini';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showToast("Config textures.ini berhasil diunduh!");
+        }
+
+        // Download Renamed Images as a ZIP Archive
+        async function downloadRenamedImagesZip() {
+            if (fileQueue.length === 0) {
+                showToast("Pilih foto terlebih dahulu!");
+                return;
+            }
+
+            showToast("Mempersiapkan ZIP file...");
+
+            const zip = new JSZip();
+            const fileExt = document.getElementById('fileExt').value || '.png';
+
+            fileQueue.forEach(item => {
+                const newFilename = `${item.pspCode}${fileExt}`;
+                zip.file(newFilename, item.file);
+            });
+
+            const content = await zip.generateAsync({ type: "blob" });
+            const url = URL.createObjectURL(content);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'psp_renamed_textures.zip';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showToast("Semua foto berhasil di-rename & didownload (.zip)!");
+        }
+
+        // Toast Notification Helper
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toastMsg');
+            toastMsg.textContent = message;
+            toast.classList.remove('opacity-0', 'pointer-events-none');
+            
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'pointer-events-none');
+            }, 2500);
+        }
+
+        // Drag and Drop Handling
+        const dropZone = document.getElementById('dropZone');
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.add('border-indigo-500', 'bg-slate-800/50'), false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.remove('border-indigo-500', 'bg-slate-800/50'), false);
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            handleFileSelect({ target: { files: files } });
+        });
+    </script>
+</body>
+</html>
